@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="SkyBridge service package">
+  <rect width="640" height="360" fill="#e8f2fb"/>
+  <g fill="none" stroke="#1677c8" stroke-width="10" stroke-linecap="round">
+    <path d="M200 220c40-110 200-110 240 0"/>
+    <path d="M190 228h260"/>
+    <path d="M260 228v-62M320 228v-86M380 228v-62" stroke-width="7"/>
+  </g>
+</svg>

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="Cloud connected to three servers">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#073a4a"/>
+      <stop offset="1" stop-color="#1c9a8a"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="360" fill="url(#g)"/>
+  <circle cx="80" cy="60" r="130" fill="#fff" opacity=".05"/>
+  <circle cx="600" cy="330" r="150" fill="#fff" opacity=".06"/>
+  <path d="M236 150a52 52 0 0196-30 44 44 0 0182 18 38 38 0 01-8 76H240a34 34 0 01-4-64z" fill="#fff"/>
+  <g fill="none" stroke="#0e8a7d" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M296 160l-16 14 16 14M344 160l16 14-16 14M328 152l-16 44"/>
+  </g>
+  <g stroke="#fff" stroke-width="6" stroke-linecap="round" opacity=".6">
+    <path d="M320 214v30M320 244H180v22M320 244h140v22M320 244v22"/>
+  </g>
+  <g fill="#fff" opacity=".92">
+    <rect x="140" y="266" width="80" height="50" rx="8"/>
+    <rect x="280" y="266" width="80" height="50" rx="8"/>
+    <rect x="420" y="266" width="80" height="50" rx="8"/>
+  </g>
+  <g fill="#0e8a7d">
+    <circle cx="158" cy="291" r="6"/><rect x="172" y="287" width="34" height="8" rx="4"/>
+    <circle cx="298" cy="291" r="6"/><rect x="312" y="287" width="34" height="8" rx="4"/>
+    <circle cx="438" cy="291" r="6"/><rect x="452" y="287" width="34" height="8" rx="4"/>
+  </g>
+</svg>

@@ -1,0 +1,7 @@
+node_modules/
+.env
+dist/
+# Vue build output; created by "npm run build" in frontend/
+backend/public/
+*.log
+.DS_Store

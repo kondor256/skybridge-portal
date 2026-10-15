@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="Pipeline with build, test and deploy stages">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#06403b"/>
+      <stop offset="1" stop-color="#14a08f"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="360" fill="url(#g)"/>
+  <circle cx="560" cy="40" r="130" fill="#fff" opacity=".06"/>
+  <circle cx="60" cy="340" r="140" fill="#fff" opacity=".05"/>
+  <path d="M110 180h420" stroke="#fff" stroke-width="10" stroke-linecap="round" opacity=".45"/>
+  <g>
+    <circle cx="140" cy="180" r="50" fill="#fff"/>
+    <circle cx="320" cy="180" r="50" fill="#fff"/>
+    <circle cx="500" cy="180" r="50" fill="#fff"/>
+  </g>
+  <g fill="none" stroke="#0e8a7d" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M126 162l-20 18 20 18M154 162l20 18-20 18"/>
+    <path d="M298 182l16 16 30-36"/>
+    <path d="M500 204v-46M482 174l18-18 18 18"/>
+  </g>
+  <g fill="#fff" opacity=".9">
+    <path d="M222 168l22 12-22 12zM402 168l22 12-22 12z"/>
+  </g>
+  <g fill="#fff" opacity=".35">
+    <rect x="100" y="262" width="80" height="12" rx="6"/>
+    <rect x="280" y="262" width="80" height="12" rx="6"/>
+    <rect x="460" y="262" width="80" height="12" rx="6"/>
+  </g>
+</svg>
