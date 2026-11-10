@@ -1,5 +1,8 @@
 node_modules/
 .env
+# Cloud database credentials used to run the SQL scripts (.env.azure, .env.aws)
+.env.*
+!.env.example
 dist/
 # Vue build output; created by "npm run build" in frontend/
 backend/public/
