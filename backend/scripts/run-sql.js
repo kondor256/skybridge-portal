@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { pool } = require('../src/db');
 
-const sqlDir = process.env.SQL_DIR || path.resolve(__dirname, '../../../sql');
+const sqlDir = process.env.SQL_DIR || path.resolve(__dirname, '../../sql');
 const scripts = {
   schema: '01_create_schema.sql',
   data: '02_insert_sample_data.sql',

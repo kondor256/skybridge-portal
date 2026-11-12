@@ -5,7 +5,7 @@ Customers browse packages, fill a cart, register, log in and place orders. Admin
 
 - `backend/`: Node.js + Express REST API. It also serves the built front end, so **one Node app** is deployed to each cloud.
 - `frontend/`: Vue 3 single-page app (Vite, vue-router, Pinia). `npm run build` writes it to `backend/public`.
-- `../sql/`: `01_create_schema.sql` and `02_insert_sample_data.sql` (PostgreSQL 16+).
+- `sql/`: database scripts for PostgreSQL 16+ (see [Database setup](#database-setup)).
 
 ## Functions
 
@@ -47,7 +47,7 @@ docker run -d --name skybridge-pg -e POSTGRES_USER=skybridge -e POSTGRES_PASSWOR
 cd backend
 copy .env.example .env        (then set PGPASSWORD=skybridge_local)
 npm install
-npm run db:reset              runs sql/01 and sql/02 (no psql needed)
+npm run db:reset              creates the tables and loads sample data (see Database setup)
 npm run dev                   API on http://localhost:3000
 
 cd ../frontend
@@ -56,6 +56,44 @@ npm run dev                   site on http://localhost:5173 (calls the API throu
 ```
 
 To run it the way the cloud does (one process): `npm run build` in `frontend`, then `npm start` in `backend`, and open http://localhost:3000.
+
+## Database setup
+
+| File in `sql/` | Purpose |
+|---|---|
+| `01_create_schema.sql` | DDL: creates the tables `users`, `categories`, `products`, `carts`, `cart_items`, `orders`, `order_items` and `session` (session store) |
+| `02_insert_sample_data.sql` | DML: sample categories, service packages, demo users, carts and orders |
+| `demo_queries.sql` | Read-only queries that show new users, changed products, carts and orders (evidence for the demo) |
+| `DATA_SOURCES.md` | Which sample data is based on real market information and which is invented |
+
+Run `01` first, then `02`. **Both scripts can be run again, but they delete existing data:** `01` drops all tables, `02` empties them. Do not run them against a database with real orders.
+
+**Option 1: Node script (no psql needed).** It reads the `PG*` variables from `backend/.env`:
+
+```
+cd backend
+npm run db:reset                                            01 + 02, then prints row counts
+node --env-file=.env scripts/run-sql.js schema              01 only
+node --env-file=.env scripts/run-sql.js data                02 only
+```
+
+The script looks for the SQL files in `../sql` by default; set `SQL_DIR` to use another folder.
+
+**Option 2: psql** (from the repository root):
+
+```
+psql "host=localhost port=5433 dbname=skybridge user=skybridge sslmode=disable" -f sql/01_create_schema.sql
+psql "host=localhost port=5433 dbname=skybridge user=skybridge sslmode=disable" -f sql/02_insert_sample_data.sql
+psql "host=localhost port=5433 dbname=skybridge user=skybridge sslmode=disable" -f sql/demo_queries.sql
+```
+
+**Cloud databases** (Azure Database for PostgreSQL flexible server, Amazon RDS for PostgreSQL):
+
+1. Allow your own IP address to reach port 5432: the server firewall on Azure, the security group inbound rule on RDS.
+2. Create the database (for example `skybridge`) if it does not exist yet.
+3. Use `sslmode=require` (in `.env`: `PGSSLMODE=require`). Azure uses the admin user name you set when you created the server, RDS uses its master user name.
+4. Run the scripts with option 1 or 2 against the cloud host, then check the row counts.
+5. Use a separate `.env` for each cloud (for example `.env.azure`, `.env.aws`; ignored by git) and run `node --env-file=.env.azure scripts/run-sql.js`.
 
 ## Demo accounts (from `02_insert_sample_data.sql`)
 
