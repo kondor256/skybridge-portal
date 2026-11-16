@@ -1,14 +1,15 @@
--- SOFT807 Assessment 1, Task 2: SkyBridge Services Portal
--- Script 1 of 2: create the database schema (PostgreSQL 16+)
--- Run on BOTH: Azure Database for PostgreSQL Flexible Server and Amazon RDS for PostgreSQL.
--- The brief requires this script; without it the database sections score zero.
+-- SOFT807 Assessment 3: SkyBridge Services Portal (A3 security version)
+-- SQL-Script-DDL: create the database schema (PostgreSQL 16+)
+-- Run on BOTH: Azure Database for PostgreSQL flexible server and Amazon RDS for PostgreSQL.
+-- A3 changes: encrypted fields are TEXT (AES-256-GCM ciphertext is longer than the plain value),
+-- users.failed_logins / users.locked_until for the login lock-out, and the audit_log table.
 --
 -- The script can be run again: it drops the tables first, so all data is lost.
--- Run 02_insert_sample_data.sql afterwards.
+-- Run SQL-Script-DML.txt afterwards.
 
 BEGIN;
 
-DROP TABLE IF EXISTS order_items, orders, cart_items, carts, products, categories, users, session CASCADE;
+DROP TABLE IF EXISTS audit_log, order_items, orders, cart_items, carts, products, categories, users, session CASCADE;
 
 -- ---------------------------------------------------------------------------
 -- Users: customers and administrators. Passwords are stored as bcrypt hashes.
@@ -17,13 +18,16 @@ CREATE TABLE users (
     id            INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     full_name     VARCHAR(100) NOT NULL,
     email         VARCHAR(254) NOT NULL,
-    phone         VARCHAR(20),
+    phone         TEXT,                              -- A3: AES-256-GCM ciphertext
     password_hash VARCHAR(72)  NOT NULL,
     role          VARCHAR(10)  NOT NULL DEFAULT 'customer',
+    failed_logins INTEGER      NOT NULL DEFAULT 0,   -- A3: lock-out after 5 failures
+    locked_until  TIMESTAMPTZ,                       -- A3: NULL = not locked
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    CONSTRAINT users_email_unique    UNIQUE (email),
-    CONSTRAINT users_email_lowercase CHECK (email = lower(email)),
-    CONSTRAINT users_role_check      CHECK (role IN ('customer', 'admin'))
+    CONSTRAINT users_email_unique        UNIQUE (email),
+    CONSTRAINT users_email_lowercase     CHECK (email = lower(email)),
+    CONSTRAINT users_role_check          CHECK (role IN ('customer', 'admin')),
+    CONSTRAINT users_failed_logins_check CHECK (failed_logins >= 0)
 );
 
 -- ---------------------------------------------------------------------------
@@ -94,9 +98,9 @@ CREATE TABLE orders (
     id            INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     user_id       INTEGER       NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     status        VARCHAR(12)   NOT NULL DEFAULT 'pending',
-    company_name  VARCHAR(120)  NOT NULL DEFAULT '',
-    contact_phone VARCHAR(20)   NOT NULL DEFAULT '',
-    notes         VARCHAR(1000) NOT NULL DEFAULT '',
+    company_name  TEXT          NOT NULL DEFAULT '',   -- A3: ciphertext
+    contact_phone TEXT          NOT NULL DEFAULT '',   -- A3: ciphertext
+    notes         TEXT          NOT NULL DEFAULT '',   -- A3: ciphertext
     subtotal      NUMERIC(12,2) NOT NULL,
     gst           NUMERIC(12,2) NOT NULL,
     total         NUMERIC(12,2) NOT NULL,
@@ -134,5 +138,23 @@ CREATE TABLE session (
 );
 
 CREATE INDEX session_expire_idx ON session (expire);
+
+-- ---------------------------------------------------------------------------
+-- Audit log (A3): security events written by the app (logins, failed logins,
+-- lock-outs, logouts, admin changes, decryption failures). It never stores
+-- passwords or decrypted field values.
+-- ---------------------------------------------------------------------------
+CREATE TABLE audit_log (
+    id         BIGINT       GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    created_at TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    event      VARCHAR(40)  NOT NULL,
+    user_id    INTEGER      REFERENCES users (id) ON DELETE SET NULL,
+    email      VARCHAR(254),
+    ip         VARCHAR(45),
+    details    JSONB        NOT NULL DEFAULT '{}'
+);
+
+CREATE INDEX audit_log_created_idx ON audit_log (created_at);
+CREATE INDEX audit_log_user_idx    ON audit_log (user_id);
 
 COMMIT;

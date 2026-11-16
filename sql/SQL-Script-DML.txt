@@ -1,18 +1,15 @@
--- SOFT807 Assessment 1, Task 2: SkyBridge Services Portal
--- Script 2 of 2: insert sample data (run after 01_create_schema.sql)
+-- SOFT807 Assessment 3: SkyBridge Services Portal (A3 security version)
+-- SQL-Script-DML: insert sample data (run after SQL-Script-DDL.txt)
 --
 -- The script can be run again: it empties the tables first.
--- All people and client organisations are fictional. E-mail addresses use the
--- reserved ".example" domain. Package scope and prices are modelled on public
--- market information (see DATA_SOURCES.md); prices are NZD, excluding GST.
---
--- Demo accounts (passwords are stored only as bcrypt hashes, cost factor 10):
---   admin     admin@skybridge.example          SkyAdmin2026!
---   customers aroha.ngata@kauricoast.example   Customer2026!   (same password for all five)
+-- Phone numbers, company names and order notes are inserted as plain text,
+-- because the encryption key must never be stored in SQL files. Run
+-- "node scripts/encrypt-existing.js" in backend/ straight after this script:
+-- it encrypts these values with the key from Key Vault / Secrets Manager.
 
 BEGIN;
 
-TRUNCATE order_items, orders, cart_items, carts, products, categories, users, session RESTART IDENTITY CASCADE;
+TRUNCATE audit_log, order_items, orders, cart_items, carts, products, categories, users, session RESTART IDENTITY CASCADE;
 
 -- ---------------------------------------------------------------------------
 -- Users: 1 administrator + 5 customers
