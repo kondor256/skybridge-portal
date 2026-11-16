@@ -3,6 +3,7 @@ const { pool } = require('../db');
 const { HttpError } = require('../middleware/error');
 const { requireAdmin } = require('../middleware/auth');
 const { validateProduct, parseId } = require('../middleware/validate');
+const { audit } = require('../audit');
 
 const PRODUCT_SELECT = `
   SELECT p.id, p.name, p.summary, p.description, p.features, p.price, p.unit, p.duration,
@@ -92,6 +93,7 @@ admin.post('/', async (req, res) => {
       [p.categoryId, p.name, p.summary, p.description, p.features, p.price, p.unit, p.duration, p.imageUrl, p.isActive],
     )
     .catch(translateDbError);
+  await audit('admin_product_created', { req, details: { productId: rows[0].id, name: p.name } });
   res.status(201).json({ product: await findProduct(rows[0].id) });
 });
 
@@ -110,14 +112,17 @@ admin.put('/:id', async (req, res) => {
   if (rowCount === 0) {
     throw new HttpError(404, 'This service package no longer exists.');
   }
+  await audit('admin_product_updated', { req, details: { productId: id, name: p.name, price: p.price, isActive: p.isActive } });
   res.json({ product: await findProduct(id) });
 });
 
 admin.delete('/:id', async (req, res) => {
-  const { rowCount } = await pool.query('DELETE FROM products WHERE id = $1', [parseId(req.params.id)]);
+  const id = parseId(req.params.id);
+  const { rowCount } = await pool.query('DELETE FROM products WHERE id = $1', [id]);
   if (rowCount === 0) {
     throw new HttpError(404, 'This service package no longer exists.');
   }
+  await audit('admin_product_deleted', { req, details: { productId: id } });
   res.status(204).end();
 });
 

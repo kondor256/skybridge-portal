@@ -8,6 +8,25 @@ const { pool } = require('../src/db');
 
 let server;
 let baseUrl;
+const testStart = new Date();
+
+// Changes one character in the middle of the ciphertext part of a stored value.
+function tamper(stored) {
+  const parts = stored.split(':');
+  const chars = [...parts[4]];
+  const i = Math.floor(chars.length / 2);
+  chars[i] = chars[i] === 'A' ? 'B' : 'A';
+  parts[4] = chars.join('');
+  return parts.join(':');
+}
+
+async function auditEvents(where, params) {
+  const { rows } = await pool.query(`SELECT event, details FROM audit_log WHERE created_at >= $1 AND ${where} ORDER BY id`, [
+    testStart,
+    ...params,
+  ]);
+  return rows;
+}
 
 // A tiny browser stand-in: keeps the session cookie between requests.
 function client() {
@@ -37,6 +56,7 @@ before(async () => {
 });
 
 after(async () => {
+  await pool.query('DELETE FROM audit_log WHERE created_at >= $1', [testStart]);
   await pool.query('DELETE FROM users WHERE email = $1', [email]);
   if (createdProductId) await pool.query('DELETE FROM products WHERE id = $1', [createdProductId]);
   await pool.query('DELETE FROM carts WHERE user_id IS NULL');
@@ -104,6 +124,14 @@ test('registration: validation, success, duplicate email', async () => {
   const { rows } = await pool.query('SELECT password_hash FROM users WHERE email = $1', [email]);
   assert.match(rows[0].password_hash, /^\$2[aby]\$10\$/);
 
+  // A3: the phone number is stored only as ciphertext, but the API returns the plain value.
+  assert.equal(ok.body.user.phone, '+64 21 555 0199');
+  const stored = (await pool.query('SELECT phone FROM users WHERE email = $1', [email])).rows[0].phone;
+  assert.match(stored, /^v1:k\d+:/);
+  assert.ok(!stored.includes('555 0199'));
+  assert.equal((await guest('GET', '/api/auth/me')).body.user.phone, '+64 21 555 0199');
+  assert.deepEqual((await auditEvents('email = $2', [email])).map((r) => r.event), ['register']);
+
   const again = await client()('POST', '/api/auth/register', {
     fullName: 'Test User', email, password, confirmPassword: password,
   });
@@ -125,6 +153,15 @@ test('login: validation, wrong password, success, logout', async () => {
   assert.equal((await c('POST', '/api/auth/logout')).status, 200);
   assert.equal((await c('GET', '/api/auth/me')).body.user, null);
   assert.equal((await c('GET', '/api/orders')).status, 401);
+
+  // A3: every login attempt and the logout are in the audit log.
+  const events = await auditEvents("(email = $2 OR email = 'nobody@apitest.example')", [email]);
+  assert.deepEqual(
+    events.map((r) => `${r.event}:${r.details.reason ?? ''}`),
+    ['register:', 'login_failed:wrong_password', 'login_failed:unknown_email', 'login_success:'],
+  );
+  const { rows } = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+  assert.equal((await auditEvents("event = 'logout' AND user_id = $2", [rows[0].id])).length, 1);
 });
 
 test('cart: guest add, edit, remove; merge on login; checkout; orders', async () => {
@@ -170,6 +207,24 @@ test('cart: guest add, edit, remove; merge on login; checkout; orders', async ()
   assert.equal(placed.body.order.subtotal, 14400);
   assert.equal(placed.body.order.total, 16560);
   assert.equal(placed.body.order.items[0].lineTotal, 14400);
+
+  // A3: company name, phone and notes are ciphertext in the database, plain text for the customer.
+  assert.equal(placed.body.order.companyName, 'Test Ltd');
+  assert.equal(placed.body.order.notes, 'api test');
+  const row = (await pool.query('SELECT company_name, contact_phone, notes FROM orders WHERE id = $1', [placed.body.order.id])).rows[0];
+  for (const value of Object.values(row)) assert.match(value, /^v1:k\d+:/);
+
+  // A3: a changed ciphertext is detected: the field is unavailable, the rest of the order still loads, and it is audited.
+  await pool.query('UPDATE orders SET notes = $1 WHERE id = $2', [tamper(row.notes), placed.body.order.id]);
+  const damaged = await c('GET', `/api/orders/${placed.body.order.id}`);
+  assert.equal(damaged.status, 200);
+  assert.equal(damaged.body.order.notes, null);
+  assert.deepEqual(damaged.body.order.unavailableFields, ['notes']);
+  assert.equal(damaged.body.order.companyName, 'Test Ltd');
+  const failures = await auditEvents("event = 'decrypt_failed' AND (details->>'id')::int = $2", [placed.body.order.id]);
+  assert.equal(failures.length, 1);
+  assert.equal(failures[0].details.field, 'notes');
+  await pool.query('UPDATE orders SET notes = $1 WHERE id = $2', [row.notes, placed.body.order.id]);
 
   assert.equal((await c('GET', '/api/cart')).body.cart.items.length, 0);
   assert.equal((await c('POST', '/api/orders', { companyName: 'Test Ltd', contactPhone: '021 555 0199' })).status, 400);
@@ -248,6 +303,13 @@ test('admin: access control, add, edit, delete, visible in the catalogue at once
   // The deleted package also left the customer's cart (it held product 9 and this one).
   assert.ok(!(await customer('GET', '/api/cart')).body.cart.items.some((i) => i.productId === createdProductId));
   createdProductId = undefined;
+
+  // A3: admin changes are audited.
+  const adminEvents = await auditEvents("event LIKE 'admin_product_%' AND user_id = 1", []);
+  assert.deepEqual(
+    adminEvents.map((r) => r.event),
+    ['admin_product_created', 'admin_product_updated', 'admin_product_updated', 'admin_product_updated', 'admin_product_deleted'],
+  );
 
   assert.equal((await admin('POST', '/api/auth/logout')).status, 200);
   assert.equal((await admin('GET', '/api/admin/products')).status, 401);

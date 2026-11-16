@@ -4,9 +4,15 @@ const { HttpError } = require('../middleware/error');
 const { requireLogin } = require('../middleware/auth');
 const { validateCheckout, parseId } = require('../middleware/validate');
 const { findCartId, loadCart } = require('../cart');
+const { encrypt } = require('../crypto/fieldCrypto');
+const { decryptRow } = require('../crypto/fields');
 
 const router = express.Router();
 router.use(requireLogin);
+
+// A3: stored as AES-256-GCM ciphertext, decrypted only for the customer who owns the order.
+const ENCRYPTED_FIELDS = ['companyName', 'contactPhone', 'notes'];
+const decryptOrder = (order, req) => decryptRow(order, ENCRYPTED_FIELDS, { req, table: 'orders' });
 
 const ORDER_SELECT = `
   SELECT o.id, o.status, o.company_name AS "companyName", o.contact_phone AS "contactPhone", o.notes,
@@ -41,7 +47,7 @@ router.post('/', async (req, res) => {
       `INSERT INTO orders (user_id, company_name, contact_phone, notes, subtotal, gst, total)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING id`,
-      [req.session.userId, companyName, contactPhone, notes, cart.subtotal, cart.gst, cart.total],
+      [req.session.userId, encrypt(companyName), encrypt(contactPhone), encrypt(notes), cart.subtotal, cart.gst, cart.total],
     );
     for (const item of cart.items) {
       await client.query(
@@ -55,7 +61,7 @@ router.post('/', async (req, res) => {
   });
 
   const { rows } = await pool.query(`${ORDER_SELECT} WHERE o.id = $1 GROUP BY o.id`, [orderId]);
-  res.status(201).json({ order: rows[0] });
+  res.status(201).json({ order: await decryptOrder(rows[0], req) });
 });
 
 router.get('/', async (req, res) => {
@@ -63,7 +69,7 @@ router.get('/', async (req, res) => {
     `${ORDER_SELECT} WHERE o.user_id = $1 GROUP BY o.id ORDER BY o.created_at DESC, o.id DESC`,
     [req.session.userId],
   );
-  res.json({ orders: rows });
+  res.json({ orders: await Promise.all(rows.map((order) => decryptOrder(order, req))) });
 });
 
 router.get('/:id', async (req, res) => {
@@ -74,7 +80,7 @@ router.get('/:id', async (req, res) => {
   if (rows.length === 0) {
     throw new HttpError(404, 'Order not found.');
   }
-  res.json({ order: rows[0] });
+  res.json({ order: await decryptOrder(rows[0], req) });
 });
 
 module.exports = router;

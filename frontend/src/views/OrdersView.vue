@@ -50,7 +50,7 @@ onMounted(load);
       <header>
         <div>
           <h2>Order #{{ order.id }}</h2>
-          <p class="muted">{{ formatDate(order.createdAt) }} · {{ order.companyName }}</p>
+          <p class="muted">{{ formatDate(order.createdAt) }} · {{ order.companyName ?? 'Company name unavailable' }}</p>
         </div>
         <span class="status" :class="`status-${order.status}`">{{ STATUS_LABELS[order.status] || order.status }}</span>
       </header>
@@ -74,7 +74,11 @@ onMounted(load);
         </tbody>
       </table>
 
-      <p v-if="order.notes" class="order-notes"><strong>Notes:</strong> {{ order.notes }}</p>
+      <!-- A3: a field that failed its integrity (GCM tag) check is shown as unavailable, never as wrong data. -->
+      <p v-if="order.unavailableFields?.includes('notes')" class="order-notes muted" data-testid="field-unavailable">
+        <strong>Notes:</strong> unavailable (the stored value failed its integrity check)
+      </p>
+      <p v-else-if="order.notes" class="order-notes"><strong>Notes:</strong> {{ order.notes }}</p>
 
       <dl class="totals totals-inline">
         <div><dt>Subtotal</dt><dd>{{ formatMoney(order.subtotal) }}</dd></div>
