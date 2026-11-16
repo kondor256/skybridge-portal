@@ -81,6 +81,8 @@ test('health endpoints answer', async () => {
   assert.equal(health.headers.get('set-cookie'), null);
   const db = await guest('GET', '/api/health/db');
   assert.equal(db.status, 200);
+  assert.equal(db.body.tls.sslMode, (process.env.PGSSLMODE || 'disable').toLowerCase());
+  assert.equal(typeof db.body.tls.encrypted, 'boolean');
 });
 
 test('catalogue: list, filter, search, details, unknown id', async () => {

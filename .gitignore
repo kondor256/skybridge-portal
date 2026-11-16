@@ -6,5 +6,9 @@ node_modules/
 dist/
 # Vue build output; created by "npm run build" in frontend/
 backend/public/
+# Private keys and certificate stores must never be committed (public CA bundles in backend/certs/ are fine)
+*.pfx
+*.key
+*.p12
 *.log
 .DS_Store

@@ -39,4 +39,6 @@ archive.directory(path.join(root, 'src'), 'src');
 archive.directory(path.join(root, 'public'), 'public');
 // A3: run once after deployment (Kudu SSH on Azure, tunnel on AWS) to encrypt existing rows.
 archive.file(path.join(root, 'scripts', 'encrypt-existing.js'), { name: 'scripts/encrypt-existing.js' });
+// A3: CA bundles for PGSSLMODE=verify-full (PGSSLROOTCERT=certs/...).
+archive.directory(path.join(root, 'certs'), 'certs');
 archive.finalize();
