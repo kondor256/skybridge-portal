@@ -1,6 +1,6 @@
 # Where the sample data comes from
 
-`02_insert_sample_data.sql` was written with Claude on 14 Oct 2026. This file records what is real-world based and what is invented, for the AI declaration and in case the report mentions the data.
+`SQL-Script-DML.txt` (A1 name: `02_insert_sample_data.sql`) was written with Claude on 14 Oct 2026. This file records what is real-world based and what is invented, for the AI declaration and in case the report mentions the data.
 
 ## Invented
 - All customers, client organisations, orders, phone numbers and e-mail addresses. E-mail addresses use the reserved `.example` domain.
