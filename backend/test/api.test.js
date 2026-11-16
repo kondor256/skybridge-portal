@@ -4,6 +4,7 @@
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const app = require('../src/app');
+const config = require('../src/config');
 const { pool } = require('../src/db');
 
 let server;
@@ -29,12 +30,16 @@ async function auditEvents(where, params) {
 }
 
 // A tiny browser stand-in: keeps the session cookie between requests.
+// Each client has its own IP address (X-Forwarded-For, trusted with TRUST_PROXY_HOPS=1),
+// so the login rate limit of one client does not affect the others.
+let nextIp = 0;
 function client() {
   let cookie = '';
+  const ip = `198.51.100.${++nextIp}`;
   return async function request(method, path, body) {
     const res = await fetch(baseUrl + path, {
       method,
-      headers: { 'Content-Type': 'application/json', ...(cookie && { Cookie: cookie }) },
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': ip, ...(cookie && { Cookie: cookie }) },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const setCookie = res.headers.get('set-cookie');
@@ -45,6 +50,7 @@ function client() {
 }
 
 const email = `test.user.${Date.now()}@apitest.example`;
+const lockEmail = `lock.test.${Date.now()}@apitest.example`;
 const password = 'TestUser2026';
 const ADMIN = { email: 'admin@skybridge.example', password: 'SkyAdmin2026!' };
 let createdProductId;
@@ -57,7 +63,7 @@ before(async () => {
 
 after(async () => {
   await pool.query('DELETE FROM audit_log WHERE created_at >= $1', [testStart]);
-  await pool.query('DELETE FROM users WHERE email = $1', [email]);
+  await pool.query('DELETE FROM users WHERE email = ANY($1)', [[email, lockEmail]]);
   if (createdProductId) await pool.query('DELETE FROM products WHERE id = $1', [createdProductId]);
   await pool.query('DELETE FROM carts WHERE user_id IS NULL');
   await new Promise((resolve) => server.close(resolve));
@@ -313,6 +319,58 @@ test('admin: access control, add, edit, delete, visible in the catalogue at once
 
   assert.equal((await admin('POST', '/api/auth/logout')).status, 200);
   assert.equal((await admin('GET', '/api/admin/products')).status, 401);
+});
+
+test('rate limit: too many failed logins from one IP give 429; other IPs are not affected', async () => {
+  const attacker = client();
+  const guess = { email: 'nobody@apitest.example', password: 'WrongPass1' };
+  const statuses = [];
+  for (let i = 0; i <= config.authRateLimit; i++) {
+    statuses.push((await attacker('POST', '/api/auth/login', guess)).status);
+  }
+  assert.deepEqual(statuses, [...Array(config.authRateLimit).fill(401), 429]);
+  const blocked = await attacker('POST', '/api/auth/login', guess);
+  assert.equal(blocked.status, 429);
+  assert.ok(blocked.headers.get('ratelimit'), 'standard RateLimit header is sent');
+
+  assert.equal((await client()('POST', '/api/auth/login', guess)).status, 401);
+  // One audit row per blocked client, not one per blocked request.
+  assert.equal((await auditEvents("event = 'rate_limited'", [])).length, 1);
+});
+
+test('lock-out: 5 wrong passwords lock the account for 15 minutes, even for the right password', async () => {
+  const c = client();
+  assert.equal((await c('POST', '/api/auth/register', { fullName: 'Lock Test', email: lockEmail, password, confirmPassword: password })).status, 201);
+  await c('POST', '/api/auth/logout');
+
+  const statuses = [];
+  for (let i = 0; i < config.lockoutThreshold; i++) {
+    statuses.push((await c('POST', '/api/auth/login', { email: lockEmail, password: 'WrongPass1' })).status);
+  }
+  assert.deepEqual(statuses, [...Array(config.lockoutThreshold - 1).fill(401), 423]);
+  const right = await c('POST', '/api/auth/login', { email: lockEmail, password });
+  assert.equal(right.status, 423);
+  assert.match(right.body.error, /locked/);
+
+  const { rows } = await pool.query(
+    'SELECT id, failed_logins, extract(epoch FROM locked_until - now()) / 60 AS minutes FROM users WHERE email = $1',
+    [lockEmail],
+  );
+  assert.ok(rows[0].minutes > config.lockoutMinutes - 1 && rows[0].minutes <= config.lockoutMinutes);
+  assert.deepEqual(
+    (await auditEvents('user_id = $2', [rows[0].id])).map((r) => `${r.event}:${r.details.reason ?? ''}`),
+    [
+      'register:', 'logout:',
+      ...Array(config.lockoutThreshold).fill('login_failed:wrong_password'),
+      'account_locked:', 'login_failed:account_locked',
+    ],
+  );
+
+  // When the lock has ended, the right password works again and the counter is reset.
+  await pool.query("UPDATE users SET locked_until = now() - interval '1 second' WHERE id = $1", [rows[0].id]);
+  assert.equal((await c('POST', '/api/auth/login', { email: lockEmail, password })).status, 200);
+  const after = (await pool.query('SELECT failed_logins, locked_until FROM users WHERE id = $1', [rows[0].id])).rows[0];
+  assert.deepEqual(after, { failed_logins: 0, locked_until: null });
 });
 
 test('malformed JSON gives 400, not a server error', async () => {

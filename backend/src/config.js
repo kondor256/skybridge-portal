@@ -24,4 +24,9 @@ module.exports = {
   instanceId: (process.env.WEBSITE_INSTANCE_ID || os.hostname()).slice(0, 12),
   gstRate: 0.15,
   dataKeyIds: dataKeys.keyIds,
+  // A3: login protection (middleware/rateLimit.js, routes/auth.js)
+  lockoutThreshold: Number(process.env.LOCKOUT_THRESHOLD) || 5,
+  lockoutMinutes: Number(process.env.LOCKOUT_MINUTES) || 15,
+  authRateLimit: Number(process.env.AUTH_RATE_LIMIT) || 10,
+  authRateWindowMinutes: Number(process.env.AUTH_RATE_WINDOW_MINUTES) || 15,
 };
