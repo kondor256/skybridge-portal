@@ -37,4 +37,6 @@ archive.file(path.join(root, 'package.json'), { name: 'package.json' });
 archive.file(path.join(root, 'package-lock.json'), { name: 'package-lock.json' });
 archive.directory(path.join(root, 'src'), 'src');
 archive.directory(path.join(root, 'public'), 'public');
+// A3: run once after deployment (Kudu SSH on Azure, tunnel on AWS) to encrypt existing rows.
+archive.file(path.join(root, 'scripts', 'encrypt-existing.js'), { name: 'scripts/encrypt-existing.js' });
 archive.finalize();

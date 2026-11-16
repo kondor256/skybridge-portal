@@ -12,6 +12,7 @@
     "dev": "node --watch --env-file-if-exists=.env src/server.js",
     "db:reset": "node --env-file-if-exists=.env scripts/run-sql.js",
     "hash": "node scripts/hash-password.js",
+    "encrypt-existing": "node scripts/encrypt-existing.js",
     "test": "node --env-file-if-exists=.env --test test/crypto.test.js test/api.test.js",
     "test:crypto": "node --test test/crypto.test.js",
     "bundle": "node scripts/bundle.js"
