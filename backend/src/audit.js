@@ -3,6 +3,7 @@
 //   admin_product_created, admin_product_updated, admin_product_deleted, decrypt_failed
 // Never put passwords, keys or decrypted field values into details.
 const { pool } = require('./db');
+const { clientIp } = require('./clientIp');
 
 async function audit(event, { req, userId, email = null, details = {} } = {}) {
   const user = userId !== undefined ? userId : (req?.session?.userId ?? null);
@@ -11,7 +12,7 @@ async function audit(event, { req, userId, email = null, details = {} } = {}) {
       event,
       user,
       email,
-      req?.ip ?? null,
+      req ? clientIp(req) : null,
       details,
     ]);
   } catch (err) {

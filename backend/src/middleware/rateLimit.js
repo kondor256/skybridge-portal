@@ -7,13 +7,18 @@
 // of proxies in front of the app (TRUST_PROXY_HOPS, see app.js and CH-38).
 // Counters are kept in memory on each instance: with 2 instances an attacker gets
 // at most twice the limit; the per-account lock-out in routes/auth.js is in the database.
-const { rateLimit } = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const config = require('../config');
 const { audit } = require('../audit');
+const { clientIp } = require('../clientIp');
 
 const authLimiter = rateLimit({
   windowMs: config.authRateWindowMinutes * 60 * 1000,
   limit: config.authRateLimit,
+  // Key = client IP without the port Azure adds (IPv6 grouped per /56 network).
+  keyGenerator: (req) => ipKeyGenerator(clientIp(req)),
+  // The IP check would warn about that port; clientIp() already removes it.
+  validate: { ip: false },
   skipSuccessfulRequests: true,
   standardHeaders: 'draft-8',
   legacyHeaders: false,

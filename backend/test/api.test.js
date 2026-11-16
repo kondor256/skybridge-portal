@@ -3,6 +3,9 @@
 // The test creates one customer, one order and one product and removes them at the end.
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
+
+// The test clients send X-Forwarded-For, as if one proxy (like Azure App Service) were in front.
+process.env.TRUST_PROXY_HOPS = '1';
 const app = require('../src/app');
 const config = require('../src/config');
 const { pool } = require('../src/db');
@@ -334,8 +337,10 @@ test('rate limit: too many failed logins from one IP give 429; other IPs are not
   assert.ok(blocked.headers.get('ratelimit'), 'standard RateLimit header is sent');
 
   assert.equal((await client()('POST', '/api/auth/login', guess)).status, 401);
-  // One audit row per blocked client, not one per blocked request.
-  assert.equal((await auditEvents("event = 'rate_limited'", [])).length, 1);
+  // One audit row per blocked client, not one per blocked request, with the client's IP.
+  const { rows } = await pool.query("SELECT ip FROM audit_log WHERE event = 'rate_limited' AND created_at >= $1", [testStart]);
+  assert.equal(rows.length, 1);
+  assert.match(rows[0].ip, /^198\.51\.100\.\d+$/);
 });
 
 test('lock-out: 5 wrong passwords lock the account for 15 minutes, even for the right password', async () => {

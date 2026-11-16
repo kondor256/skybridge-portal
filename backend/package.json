@@ -13,7 +13,7 @@
     "db:reset": "node --env-file-if-exists=.env scripts/run-sql.js",
     "hash": "node scripts/hash-password.js",
     "encrypt-existing": "node scripts/encrypt-existing.js",
-    "test": "node --env-file-if-exists=.env --test test/crypto.test.js test/api.test.js",
+    "test": "node --env-file-if-exists=.env --test --test-concurrency=1 test/crypto.test.js test/api.test.js test/proxy.test.js",
     "test:crypto": "node --test test/crypto.test.js",
     "bundle": "node scripts/bundle.js"
   },

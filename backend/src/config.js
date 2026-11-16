@@ -24,6 +24,10 @@ module.exports = {
   instanceId: (process.env.WEBSITE_INSTANCE_ID || os.hostname()).slice(0, 12),
   gstRate: 0.15,
   dataKeyIds: dataKeys.keyIds,
+  // A3: proxies in front of the app: local 0, Azure App Service 1, AWS CloudFront + load balancer 2
+  trustProxyHops: Number(process.env.TRUST_PROXY_HOPS) || 0,
+  // A3 (AWS): take the visitor's protocol from CloudFront-Forwarded-Proto (CH-36)
+  trustCloudFrontProto: process.env.TRUST_CLOUDFRONT_PROTO === 'true',
   // A3: login protection (middleware/rateLimit.js, routes/auth.js)
   lockoutThreshold: Number(process.env.LOCKOUT_THRESHOLD) || 5,
   lockoutMinutes: Number(process.env.LOCKOUT_MINUTES) || 15,

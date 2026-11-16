@@ -16,25 +16,43 @@ const indexFile = path.join(publicDir, 'index.html');
 
 const app = express();
 
-// Both clouds put a reverse proxy / load balancer in front of the app. Trusting
-// it lets Express see the original protocol (https on Azure, http on the
-// default Elastic Beanstalk URL) and the visitor's IP address.
-app.set('trust proxy', 1);
+// A3: number of proxies in front of the app (TRUST_PROXY_HOPS): Azure App Service 1,
+// AWS CloudFront + load balancer 2, local 0. With the right number, req.ip is the
+// visitor's address (rate limit, audit log) and req.secure is true for HTTPS (CH-38).
+// Too high lets a client fake its IP with X-Forwarded-For; too low makes every
+// visitor look like the proxy and share one rate limit.
+app.set('trust proxy', config.trustProxyHops);
 app.disable('x-powered-by');
 
+// A3 (AWS): CloudFront talks to the load balancer over HTTP, so the load balancer sets
+// X-Forwarded-Proto: http even when the visitor used HTTPS. CloudFront adds
+// CloudFront-Forwarded-Proto with the visitor's protocol; use it, so Express sees
+// HTTPS and sends the Secure session cookie (CH-36).
+if (config.trustCloudFrontProto) {
+  app.use((req, res, next) => {
+    if (req.get('cloudfront-forwarded-proto') === 'https') {
+      req.headers['x-forwarded-proto'] = 'https';
+    }
+    next();
+  });
+}
+
+// A3: in production both clouds serve the site over HTTPS only (Azure "HTTPS Only",
+// CloudFront "Redirect HTTP to HTTPS"), so HSTS and upgrade-insecure-requests are on.
+// Locally (http://localhost) they stay off.
 app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
         'img-src': ["'self'", 'data:', 'https:'],
-        // The default Elastic Beanstalk URL is plain HTTP; this directive would
-        // make the browser request every script and style over HTTPS and fail.
-        'upgrade-insecure-requests': null,
+        'upgrade-insecure-requests': config.isProduction ? [] : null,
       },
     },
-    // These two headers are ignored on HTTP origins and only add browser console messages there.
-    crossOriginOpenerPolicy: false,
-    originAgentCluster: false,
+    // Browsers use only HTTPS for this site for one year after the first visit.
+    strictTransportSecurity: config.isProduction ? { maxAge: 31536000, includeSubDomains: true } : false,
+    // Ignored on HTTP origins and only add browser console messages there.
+    crossOriginOpenerPolicy: config.isProduction,
+    originAgentCluster: config.isProduction,
   }),
 );
 
@@ -62,7 +80,9 @@ api.use(
     cookie: {
       httpOnly: true,
       sameSite: 'lax',
-      secure: 'auto', // Secure flag on HTTPS requests only
+      // A3: production sends the cookie only over HTTPS (Secure flag). Behind a proxy this
+      // needs the right TRUST_PROXY_HOPS, otherwise no cookie is set at all (CH-36).
+      secure: config.isProduction ? true : 'auto',
       maxAge: 8 * 60 * 60 * 1000,
     },
   }),
