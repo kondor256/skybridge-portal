@@ -9,6 +9,11 @@ if (isProduction && !process.env.SESSION_SECRET) {
   throw new Error('SESSION_SECRET must be set in production');
 }
 
+// A3: the data-encryption key is checked at start-up, so a missing or wrong key
+// stops the app at once instead of failing on the first order.
+const { loadKeys } = require('./crypto/keys');
+const dataKeys = loadKeys();
+
 module.exports = {
   isProduction,
   port: Number(process.env.PORT) || 3000,
@@ -18,4 +23,5 @@ module.exports = {
   // Azure App Service gives every instance an id; elsewhere the host name is unique per instance.
   instanceId: (process.env.WEBSITE_INSTANCE_ID || os.hostname()).slice(0, 12),
   gstRate: 0.15,
+  dataKeyIds: dataKeys.keyIds,
 };

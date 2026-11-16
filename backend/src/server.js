@@ -3,7 +3,7 @@ const config = require('./config');
 const { pool } = require('./db');
 
 const server = app.listen(config.port, () => {
-  console.log(`SkyBridge Services Portal listening on port ${config.port} (${config.platform}, instance ${config.instanceId})`);
+  console.log(`SkyBridge Services Portal listening on port ${config.port} (${config.platform}, instance ${config.instanceId}, data keys ${config.dataKeyIds.join(',')})`);
 });
 
 // When the platform scales in or restarts an instance it sends SIGTERM:
